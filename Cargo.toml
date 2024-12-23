@@ -7,3 +7,6 @@ description = "Write parts of a Vec from different threads"
 repository = "https://github.com/davidlattimore/sharded-vec-writer"
 
 [dependencies]
+
+[dev-dependencies]
+trybuild = "1.0"

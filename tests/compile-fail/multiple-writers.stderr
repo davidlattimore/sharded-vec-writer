@@ -1,0 +1,9 @@
+error[E0499]: cannot borrow `v` as mutable more than once at a time
+ --> tests/compile-fail/multiple-writers.rs:6:38
+  |
+5 |     let mut writer1 = VecWriter::new(&mut v);
+  |                                      ------ first mutable borrow occurs here
+6 |     let mut writer2 = VecWriter::new(&mut v);
+  |                                      ^^^^^^ second mutable borrow occurs here
+7 |     let mut shard1 = writer1.take_shard(2);
+  |                      ------- first borrow later used here

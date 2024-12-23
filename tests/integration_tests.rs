@@ -108,6 +108,8 @@ fn not_fully_initialised() {
         shard1.push(i);
     }
 
+    assert_eq!(shard1.init_mut(), &[0, 1]);
+
     assert_eq!(
         writer.try_return_shard(shard1).unwrap_err(),
         InitError::UninitElements
@@ -154,4 +156,10 @@ fn drop_without_returning() {
     assert_eq!(Rc::strong_count(&r), 2);
     drop(shard1);
     assert_eq!(Rc::strong_count(&r), 1);
+}
+
+#[test]
+fn compile_fail_tests() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/*.rs");
 }

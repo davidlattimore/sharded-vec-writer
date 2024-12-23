@@ -28,7 +28,7 @@ pub struct Shard<'vec, T> {
     _phantom: PhantomData<&'vec mut T>,
 }
 
-impl<'vec, T> Drop for Shard<'vec, T> {
+impl<T> Drop for Shard<'_, T> {
     fn drop(&mut self) {
         // We've been dropped without being returned to the writer, clean up any values that were
         // written so that they don't leak.
@@ -105,14 +105,16 @@ impl<'vec, T> VecWriter<'vec, T> {
     }
 }
 
-impl<'builder, T> Shard<'builder, T> {
+impl<T> Shard<'_, T> {
     /// Appends a value to the shard. Panics if the shard has already been fully used.
     #[track_caller]
+    #[inline]
     pub fn push(&mut self, value: T) {
         self.try_push(value).unwrap();
     }
 
     /// Appends a value to the shard or returns an error if it has already been fully used.
+    #[inline]
     pub fn try_push(&mut self, value: T) -> Result<(), InsufficientCapacity> {
         if self.initialised_up_to == self.end_offset {
             return Err(InsufficientCapacity);
@@ -125,7 +127,31 @@ impl<'builder, T> Shard<'builder, T> {
         Ok(())
     }
 
+    /// Returns the size of this shard (initialised and uninitialised).
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.end_offset - self.start_offset
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns a slice containing the data that has already been initialised.
+    #[inline]
+    pub fn init_mut(&mut self) -> &mut [T] {
+        // Safety: The memory has already been initialised with valid values of T via calls to
+        // `try_push`. The returned slice will not alias slices returned by other shards.
+        unsafe {
+            std::slice::from_raw_parts_mut(
+                self.storage.add(self.start_offset),
+                self.initialised_up_to - self.start_offset,
+            )
+        }
+    }
+
     /// Returns the offset in the output vector at which the next push will write.
+    #[inline]
     pub fn output_offset(&self) -> usize {
         self.initialised_up_to
     }
