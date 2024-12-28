@@ -1,0 +1,12 @@
+error[E0502]: cannot borrow `v` as immutable because it is also borrowed as mutable
+  --> tests/compile-fail/alias_via_push_return.rs:9:15
+   |
+5  |     let mut writer = VecWriter::new(&mut v);
+   |                                     ------ mutable borrow occurs here
+...
+9  |     println!("{v:?}");
+   |               ^^^^^ immutable borrow occurs here
+10 |     *v1 = 1;
+   |     ------- mutable borrow later used here
+   |
+   = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)

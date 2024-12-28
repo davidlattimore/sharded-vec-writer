@@ -1,9 +1,0 @@
-error[E0499]: cannot borrow `shard` as mutable more than once at a time
-  --> tests/compile-fail/multiple_init_mut.rs:10:14
-   |
-9  |     let m1 = shard.init_mut();
-   |              ----- first mutable borrow occurs here
-10 |     let m2 = shard.init_mut();
-   |              ^^^^^ second mutable borrow occurs here
-11 |     m1[0] = 2;
-   |     ----- first borrow later used here

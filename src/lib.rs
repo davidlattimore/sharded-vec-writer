@@ -105,26 +105,34 @@ impl<'vec, T> VecWriter<'vec, T> {
     }
 }
 
-impl<T> Shard<'_, T> {
-    /// Appends a value to the shard. Panics if the shard has already been fully used.
+impl<'store, T> Shard<'store, T> {
+    /// Appends a value to the shard. Panics if the shard has already been fully used. Returns a
+    /// mutable reference to the value that was pushed.
     #[track_caller]
     #[inline]
-    pub fn push(&mut self, value: T) {
-        self.try_push(value).unwrap();
+    pub fn push(&mut self, value: T) -> &'store mut T {
+        self.try_push(value).unwrap()
     }
 
     /// Appends a value to the shard or returns an error if it has already been fully used.
     #[inline]
-    pub fn try_push(&mut self, value: T) -> Result<(), InsufficientCapacity> {
+    pub fn try_push(&mut self, value: T) -> Result<&'store mut T, InsufficientCapacity> {
         if self.initialised_up_to == self.end_offset {
             return Err(InsufficientCapacity);
         }
+        let ptr;
         // Safety: The memory we're writing to was allocated by the Vec that we're writing. It's
         // currently uninitialised (not that that matters for safety). It doesn't alias, since all
         // shards are created non-overlapping.
-        unsafe { self.storage.add(self.initialised_up_to).write(value) };
+        unsafe {
+            ptr = self.storage.add(self.initialised_up_to);
+            ptr.write(value);
+        }
         self.initialised_up_to += 1;
-        Ok(())
+        // Safety: The memory to which we're taking a reference is now initialised with a valid T.
+        // Alignment requirement will have been upheld by the underlying Vec. The returned reference
+        // won't alias with references returned by any other calls to push, since we always advance.
+        Ok(unsafe { &mut *ptr })
     }
 
     /// Returns the size of this shard (initialised and uninitialised).
@@ -135,19 +143,6 @@ impl<T> Shard<'_, T> {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    /// Returns a slice containing the data that has already been initialised.
-    #[inline]
-    pub fn init_mut(&mut self) -> &mut [T] {
-        // Safety: The memory has already been initialised with valid values of T via calls to
-        // `try_push`. The returned slice will not alias slices returned by other shards.
-        unsafe {
-            std::slice::from_raw_parts_mut(
-                self.storage.add(self.start_offset),
-                self.initialised_up_to - self.start_offset,
-            )
-        }
     }
 
     /// Returns the offset in the output vector at which the next push will write.

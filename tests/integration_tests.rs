@@ -35,6 +35,29 @@ fn basic_usage() {
 }
 
 #[test]
+fn update_refs_afterwards() {
+    let mut v1 = Vec::with_capacity(10);
+    let mut writer: VecWriter<u32> = VecWriter::new(&mut v1);
+    let mut shard1 = writer.take_shard(4);
+    let mut shard2 = writer.take_shard(4);
+
+    let shard1_refs = (0..4).map(|i| shard1.push(i)).collect::<Vec<_>>();
+    let shard2_refs = (4..8).map(|i| shard2.push(i)).collect::<Vec<_>>();
+
+    for v in shard1_refs {
+        *v += 100;
+    }
+    for v in shard2_refs {
+        *v += 200;
+    }
+
+    writer.return_shard(shard1);
+    writer.return_shard(shard2);
+
+    assert_eq!(v1, &[100, 101, 102, 103, 204, 205, 206, 207])
+}
+
+#[test]
 fn empty() {
     let mut v = Vec::with_capacity(0);
     let mut writer: VecWriter<u32> = VecWriter::new(&mut v);
@@ -108,8 +131,6 @@ fn not_fully_initialised() {
         shard1.push(i);
     }
 
-    assert_eq!(shard1.init_mut(), &[0, 1]);
-
     assert_eq!(
         writer.try_return_shard(shard1).unwrap_err(),
         InitError::UninitElements
@@ -158,6 +179,7 @@ fn drop_without_returning() {
     assert_eq!(Rc::strong_count(&r), 1);
 }
 
+#[cfg(not(miri))]
 #[test]
 fn compile_fail_tests() {
     let t = trybuild::TestCases::new();
