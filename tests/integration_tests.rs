@@ -61,7 +61,7 @@ fn update_refs_afterwards() {
 fn empty() {
     let mut v = Vec::with_capacity(0);
     let mut writer: VecWriter<u32> = VecWriter::new(&mut v);
-    assert!(writer.try_take_shard(8).is_none());
+    assert!(writer.try_take_shard(8).is_err());
 }
 
 #[test]
