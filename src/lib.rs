@@ -50,7 +50,7 @@ impl<'vec, T> VecWriter<'vec, T> {
 
     /// Takes the next `n` elements of the vector or panics if there is insufficient capacity.
     pub fn take_shard(&mut self, n: usize) -> Shard<'vec, T> {
-        self.try_take_shard(n).unwrap_or_else(|| {
+        self.try_take_shard(n).unwrap_or_else(|_| {
             panic!(
                 "Tried to take {n} when only {} available",
                 self.storage.capacity() - self.taken
@@ -58,11 +58,12 @@ impl<'vec, T> VecWriter<'vec, T> {
         })
     }
 
-    /// Takes the next `n` elements of the vector or returns None if there is insufficient capacity.
-    pub fn try_take_shard(&mut self, n: usize) -> Option<Shard<'vec, T>> {
+    /// Takes the next `n` elements of the vector or returns an error if there is insufficient
+    /// capacity.
+    pub fn try_take_shard(&mut self, n: usize) -> Result<Shard<'vec, T>, InsufficientCapacity> {
         let end_offset = self.taken.saturating_add(n);
         if end_offset > self.storage.capacity() {
-            return None;
+            return Err(InsufficientCapacity);
         }
         let shard = Shard {
             storage: self.storage.as_mut_ptr(),
@@ -72,7 +73,19 @@ impl<'vec, T> VecWriter<'vec, T> {
             _phantom: Default::default(),
         };
         self.taken = end_offset;
-        Some(shard)
+        Ok(shard)
+    }
+
+    /// Takes shards with sizes supplied by `sizes`. Panics if there is insufficient capacity.
+    pub fn take_shards(&mut self, sizes: impl Iterator<Item = usize>) -> Vec<Shard<'vec, T>> {
+        sizes.map(|n| self.take_shard(n)).collect()
+    }
+
+    pub fn try_take_shards(
+        &mut self,
+        sizes: impl Iterator<Item = usize>,
+    ) -> Result<Vec<Shard<'vec, T>>, InsufficientCapacity> {
+        sizes.map(|n| self.try_take_shard(n)).collect()
     }
 
     /// Returns a shard to the vector, increasing the initialised length of the vector by the size
@@ -102,6 +115,21 @@ impl<'vec, T> VecWriter<'vec, T> {
         // dropping it, otherwise it'll double-free the values in the shard.
         core::mem::forget(shard);
         Ok(())
+    }
+
+    /// Returns the supplied shards. Panics if any shards have not been fully initialised or if the
+    /// shards are out-of-order.
+    pub fn return_shards(&mut self, shards: Vec<Shard<T>>) {
+        shards
+            .into_iter()
+            .for_each(|shard| self.return_shard(shard));
+    }
+
+    /// Returns the supplied shards.
+    pub fn try_return_shards(&mut self, shards: Vec<Shard<T>>) -> Result<(), InitError> {
+        shards
+            .into_iter()
+            .try_for_each(|shard| self.try_return_shard(shard))
     }
 }
 
